@@ -6,9 +6,7 @@ from pathlib import Path
 import click
 from loguru import logger
 
-# FIXME reimplement download_from_url to avoid dependency on neurodatasets.files
-from neurodatasets.files import download_from_url
-
+from ._utilities import download_from_url
 from .environment import CONTAINERS_HOME, FREESURFER_HOME
 from .smriprep import _get_smriprep_container
 
