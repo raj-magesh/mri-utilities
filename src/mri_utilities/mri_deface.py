@@ -58,7 +58,10 @@ def _prepare_mri_deface_utilities(
     help="path where sMRIPrep Apptainer container should be placed",
 )
 @click.option(
-    "--version", default="0.19.2", type=click.STRING, help="sMRIPrep version to use"
+    "--version",
+    default="0.19.2",
+    type=click.STRING,
+    help="sMRIPrep version to use",
 )
 def run_mri_deface(
     input_path: Path,
@@ -103,7 +106,7 @@ def run_mri_deface(
 
     logger.info(
         f"Running mri_deface on {input_path}"
-        f" using sMRIPrep container at {smriprep_filepath} ..."
+        f" using sMRIPrep container at {smriprep_filepath} ...",
     )
 
     output = subprocess.run(  # noqa: S603

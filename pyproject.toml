@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build==0.11.3"]
+requires = ["uv_build<0.12"]
 build-backend = "uv_build"
 
 [project]
@@ -37,7 +37,7 @@ run_smriprep = "mri_utilities.smriprep:run_smriprep"
 run_mri_deface = "mri_utilities.mri_deface:run_mri_deface"
 
 [dependency-groups]
-dev = ["ruff", "pytest", "sphinx"]
+dev = ["ruff", "ty", "pytest", "sphinx"]
 
 [tool.uv]
 required-environments = [
