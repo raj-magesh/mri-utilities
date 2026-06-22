@@ -1,18 +1,16 @@
 import os
 from pathlib import Path
 
-from xdg_base_dirs import xdg_data_home
+if freesurfer_home := os.getenv("FREESURFER_HOME"):
+    FREESURFER_HOME = Path(freesurfer_home)
+elif xdg_data_home := os.getenv("XDG_DATA_HOME"):
+    FREESURFER_HOME = Path(xdg_data_home) / "freesurfer"
+else:
+    FREESURFER_HOME = Path.home() / ".local" / "share" / "freesurfer"
 
-FREESURFER_HOME = Path(
-    os.getenv(
-        "FREESURFER_HOME",
-        str(xdg_data_home() / "freesurfer"),
-    ),
-)
-
-CONTAINERS_HOME = Path(
-    os.getenv(
-        "CONTAINERS_HOME",
-        str(xdg_data_home() / "containers"),
-    ),
-)
+if containers_home := os.getenv("CONTAINERS_HOME"):
+    CONTAINERS_HOME = Path(containers_home)
+elif xdg_data_home := os.getenv("XDG_DATA_HOME"):
+    CONTAINERS_HOME = Path(xdg_data_home) / "containers"
+else:
+    CONTAINERS_HOME = Path.home() / ".local" / "share" / "containers"

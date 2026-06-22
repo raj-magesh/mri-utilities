@@ -1,13 +1,16 @@
+import os
 import subprocess
 from pathlib import Path
 
 import click
 from loguru import logger
-from xdg_base_dirs import xdg_cache_home
 
 from .environment import CONTAINERS_HOME, FREESURFER_HOME
 
-WORK_DIR = xdg_cache_home() / "smriprep"
+if xdg_cache_home := os.getenv("XDG_CACHE_HOME"):
+    WORK_DIR = Path(xdg_cache_home) / "smriprep"
+else:
+    WORK_DIR = Path.home() / ".cache" / "smriprep"
 
 
 def _get_smriprep_container(directory: Path, *, version: str) -> Path:

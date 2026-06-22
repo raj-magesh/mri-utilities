@@ -25,7 +25,6 @@ classifiers = [
 urls = { repository = "https://codeberg.org/raj-magesh/mri-utilities" }
 dependencies = [
     "loguru",
-    "xdg_base_dirs",
     # "dcm2niix", # FIXME when cmake on cluster gets better
     "heudiconv[all]",
 ]
