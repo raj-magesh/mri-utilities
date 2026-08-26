@@ -1,12 +1,13 @@
 [build-system]
-requires = ["uv_build<0.12"]
+requires = ["uv_build<0.13"]
 build-backend = "uv_build"
 
 [project]
 name = "mri-utilities"
+version = "0.1.0"
 description = "Miscellaneous utilities to work with MRI data"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 authors = [
@@ -22,14 +23,9 @@ classifiers = [
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
 ]
-urls = { repository = "https://codeberg.org/raj-magesh/mri-utilities" }
-dependencies = [
-    "loguru",
-    # "dcm2niix", # FIXME when cmake on cluster gets better
-    "heudiconv[all]",
-]
+urls = { source = "https://codeberg.org/raj-magesh/mri-utilities" }
+dependencies = ["loguru", "dcm2niix", "heudiconv[all]"]
 import-names = ["mri_utilities"]
-version = "0.1.0"
 
 [project.scripts]
 run_smriprep = "mri_utilities.smriprep:run_smriprep"
