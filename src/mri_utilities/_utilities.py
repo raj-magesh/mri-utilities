@@ -1,9 +1,23 @@
+import os
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
 import requests
 from loguru import logger
+from platformdirs import user_data_path
 from tqdm.auto import tqdm
+
+if freesurfer_home := os.getenv("FREESURFER_HOME"):
+    FREESURFER_HOME = Path(freesurfer_home)
+else:
+    FREESURFER_HOME = user_data_path("freesurfer")
+
+if containers_home := os.getenv("CONTAINERS_HOME"):
+    CONTAINERS_HOME = Path(containers_home)
+else:
+    CONTAINERS_HOME = user_data_path("containers")
 
 HTTP_OK_RESPONSE_CODE = 200
 
@@ -55,5 +69,41 @@ def download_from_url(
         return Path(file_handle.name)
 
     filepath.parent.mkdir(exist_ok=True, parents=True)
-    Path(file_handle.name).move(filepath)
+    shutil.move(file_handle.name, filepath)
+    return filepath
+
+
+def build_apptainer_container(
+    directory: Path,
+    *,
+    organization: str,
+    package: str,
+    version: str,
+) -> Path:
+    filepath = directory / f"{package}-{version}.simg"
+
+    if filepath.exists():
+        return filepath
+
+    logger.info(f"Attempting to build {package}-{version} container at {filepath}...")
+
+    output = subprocess.run(
+        [
+            "/usr/bin/env",
+            "apptainer",
+            "build",
+            str(filepath),
+            f"docker://{organization}/{package}:{version}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    logger.debug(output.stdout)
+
+    if output.returncode == 0:
+        logger.info(f"Successfully built {package}-{version} container at {filepath}.")
+    else:
+        logger.error(f"Failed to build {package}-{version} container at {filepath}.")
+
     return filepath

@@ -1,4 +1,4 @@
-import subprocess
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -14,7 +14,7 @@ def run_heudiconv(
     heuristic: Path,
     subject: str,
 ) -> None:
-    output = subprocess.run(  # noqa: S603
+    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             "/usr/bin/env",
             "heudiconv",
