@@ -2,5 +2,5 @@ preview = true
 
 [lint]
 select = ["ALL"]
-ignore = ["CPY001"]
+ignore = ["missing-copyright-notice"]
 pydocstyle.convention = "numpy"
