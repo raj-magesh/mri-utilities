@@ -4,7 +4,11 @@ from pathlib import Path
 import nibabel as nib
 from loguru import logger
 
-from ._utilities import CONTAINERS_HOME, FREESURFER_HOME, build_apptainer_container
+from mri_utilities._utilities import (
+    CONTAINERS_HOME,
+    FREESURFER_HOME,
+    build_apptainer_container,
+)
 
 FASTSURFER_VERSION = "cuda-v2.5.4"
 FREESURFER_VERSION = "8.2.0"
@@ -32,7 +36,9 @@ def run_fastsurfer(
     min_voxel_size = min(nib.nifti1.load(data_dir / t1_path).header.get_zooms())
     if min_voxel_size < fastsurfer_min_voxel_size:
         logger.info(
-            f"Setting `--vox_size {fastsurfer_min_voxel_size}` since FastSurfer isn't validated with higher resolution images (current minimum voxel dimension: {min_voxel_size:.1f} mm)",
+            "Setting `--vox_size {fastsurfer_min_voxel_size}` since FastSurfer isn't validated with higher resolution images (current minimum voxel dimension: {min_voxel_size:.1f} mm)",
+            fastsurfer_min_voxel_size=fastsurfer_min_voxel_size,
+            min_voxel_size=min_voxel_size,
         )
         vox_size = 0.7
     else:
@@ -66,8 +72,10 @@ def run_fastsurfer(
         f"{vox_size}",
     ]
     logger.info(
-        f"Running FastSurfer for subject sub-{subject}"
-        f" using FastSurfer container at {fastsurfer_filepath} ...",
+        "Running FastSurfer for subject sub-{subject}"
+        " using FastSurfer container at {fastsurfer_filepath} ...",
+        subject=subject,
+        fastsurfer_filepath=fastsurfer_filepath,
     )
 
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
@@ -80,10 +88,14 @@ def run_fastsurfer(
 
     if output.returncode == 0:
         logger.info(
-            f"Successfully ran FastSurfer for subject sub-{subject}.",
+            "Successfully ran FastSurfer for subject sub-{subject}.",
+            subject=subject,
         )
     else:
-        logger.error(f"Failed to run FastSurfer for subject sub-{subject}.")
+        logger.error(
+            "Failed to run FastSurfer for subject sub-{subject}.",
+            subject=subject,
+        )
 
 
 def run_subregion_segmentation(

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from ._utilities import CONTAINERS_HOME, FREESURFER_HOME
+from mri_utilities._utilities import CONTAINERS_HOME, FREESURFER_HOME
 
 if xdg_cache_home := os.getenv("XDG_CACHE_HOME"):
     WORK_DIR = Path(xdg_cache_home) / "smriprep"

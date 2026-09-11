@@ -71,9 +71,12 @@ def run_dcm2niix(
             str(output_directory),
         ])
 
-    logger.info(f"Running dcm2niix on {input_directory} ...")
+    logger.info(
+        "Running dcm2niix on {input_directory} ...",
+        input_directory=input_directory,
+    )
 
-    output = subprocess.run(  # noqa: S603
+    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             *command,
             *options,

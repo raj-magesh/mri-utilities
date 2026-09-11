@@ -34,13 +34,13 @@ def download_from_url(
 ) -> Path:
     if filepath is not None and filepath.exists():
         if overwrite:
-            logger.info(f"Deleting existing file at {filepath}")
+            logger.info("Deleting existing file at {filepath}", filepath=filepath)
             filepath.unlink()
         else:
-            logger.info(f"Using existing file at {filepath}")
+            logger.info("Using existing file at {filepath}", filepath=filepath)
             return filepath
 
-    logger.info(f"Downloading from {url} to {filepath}")
+    logger.info("Downloading from {url} to {filepath}", url=url, filepath=filepath)
 
     response = requests.get(url, stream=stream, timeout=timeout, **kwargs)
 
@@ -85,7 +85,12 @@ def build_apptainer_container(
     if filepath.exists():
         return filepath
 
-    logger.info(f"Attempting to build {package}-{version} container at {filepath}...")
+    logger.info(
+        "Attempting to build {package}-{version} container at {filepath}...",
+        package=package,
+        version=version,
+        filepath=filepath,
+    )
 
     output = subprocess.run(
         [
@@ -102,8 +107,18 @@ def build_apptainer_container(
     logger.debug(output.stdout)
 
     if output.returncode == 0:
-        logger.info(f"Successfully built {package}-{version} container at {filepath}.")
+        logger.info(
+            "Successfully built {package}-{version} container at {filepath}.",
+            package=package,
+            version=version,
+            filepath=filepath,
+        )
     else:
-        logger.error(f"Failed to build {package}-{version} container at {filepath}.")
+        logger.error(
+            "Failed to build {package}-{version} container at {filepath}.",
+            package=package,
+            version=version,
+            filepath=filepath,
+        )
 
     return filepath

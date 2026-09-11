@@ -1,3 +1,3 @@
 __all__ = ("deface",)
 
-from ._defacing import deface
+from mri_utilities.defacing._defacing import deface
