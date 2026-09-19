@@ -9,17 +9,18 @@ from loguru import logger
 from platformdirs import user_data_path
 from tqdm.auto import tqdm
 
-if freesurfer_home := os.getenv("FREESURFER_HOME"):
-    FREESURFER_HOME = Path(freesurfer_home)
-else:
-    FREESURFER_HOME = user_data_path("freesurfer")
-
 if containers_home := os.getenv("CONTAINERS_HOME"):
     CONTAINERS_HOME = Path(containers_home)
 else:
     CONTAINERS_HOME = user_data_path("containers")
 
-HTTP_OK_RESPONSE_CODE = 200
+
+def get_freesurfer_license_path() -> Path:
+    fs_license = os.getenv("FS_LICENSE")
+    if fs_license is None:
+        error = "The environment FS_LICENSE must be set to the path of the FreeSurfer license agreement if fs_license is not provided as an input path!"
+        raise ValueError(error)
+    return Path(fs_license)
 
 
 def download_from_url(
@@ -44,7 +45,8 @@ def download_from_url(
 
     response = requests.get(url, stream=stream, timeout=timeout, **kwargs)
 
-    if response.status_code != HTTP_OK_RESPONSE_CODE:
+    http_ok_response_code = 200
+    if response.status_code != http_ok_response_code:
         response.raise_for_status()
         error = f"Request to {url} returned status code {response.status_code}"
         raise RuntimeError(error)

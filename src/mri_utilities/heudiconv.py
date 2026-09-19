@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 
@@ -13,7 +14,9 @@ def run_heudiconv(
     output_directory: Path,
     heuristic: Path,
     subject: str,
+    extra_options: Sequence[str] = (),
 ) -> None:
+    output_directory.parent.mkdir(exist_ok=True, parents=True)
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             "/usr/bin/env",
@@ -28,14 +31,13 @@ def run_heudiconv(
             subject,
             "--converter",
             "dcm2niix",
-            "--grouping",
-            "all",
             "--bids",
             "notop",
             "--minmeta",
             "--overwrite",
             "--random-seed",
             "0",
+            *extra_options,
         ],
         capture_output=True,
         text=True,

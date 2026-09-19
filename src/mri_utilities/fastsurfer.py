@@ -6,12 +6,11 @@ from loguru import logger
 
 from mri_utilities._utilities import (
     CONTAINERS_HOME,
-    FREESURFER_HOME,
     build_apptainer_container,
+    get_freesurfer_license_path,
 )
 
 FASTSURFER_VERSION = "cuda-v2.5.4"
-FREESURFER_VERSION = "8.2.0"
 
 
 def run_fastsurfer(
@@ -19,17 +18,19 @@ def run_fastsurfer(
     *,
     data_dir: Path,
     containers_dir: Path = CONTAINERS_HOME,
-    freesurfer_home: Path = FREESURFER_HOME,
+    fs_license: Path | None = None,
     version: str = FASTSURFER_VERSION,
 ) -> None:
-    fastsurfer_filepath = build_apptainer_container(
+    container_path = build_apptainer_container(
         directory=containers_dir,
         organization="deepmi",
         package="fastsurfer",
         version=version,
     )
 
-    (data_dir / "derivatives" / "fastsurfer").mkdir(exist_ok=True, parents=True)
+    (data_dir / "derivatives" / f"fastsurfer-{version}").mkdir(
+        exist_ok=True, parents=True
+    )
     t1_path = Path(f"rawdata/sub-{subject}/anat/sub-{subject}_rec-defaced_T1w.nii.gz")
 
     fastsurfer_min_voxel_size = 0.7
@@ -44,6 +45,8 @@ def run_fastsurfer(
     else:
         vox_size = "min"
 
+    fs_license = fs_license or get_freesurfer_license_path()
+
     command = [
         "/usr/bin/env",
         "apptainer",
@@ -54,8 +57,8 @@ def run_fastsurfer(
         "--bind",
         f"{data_dir}:/data",
         "--bind",
-        f"{freesurfer_home}:/freesurfer",
-        str(fastsurfer_filepath),
+        f"{fs_license.parent}:/freesurfer",
+        str(container_path),
         "/fastsurfer/run_fastsurfer.sh",
         "--fs_license",
         "/freesurfer/license.txt",
@@ -64,7 +67,7 @@ def run_fastsurfer(
         "--sid",
         f"sub-{subject}",
         "--sd",
-        "/data/derivatives/fastsurfer",
+        f"/data/derivatives/fastsurfer-{version}",
         "--threads",
         "max",
         "--3T",
@@ -73,9 +76,9 @@ def run_fastsurfer(
     ]
     logger.info(
         "Running FastSurfer for subject sub-{subject}"
-        " using FastSurfer container at {fastsurfer_filepath} ...",
+        " using FastSurfer container at {container_path} ...",
         subject=subject,
-        fastsurfer_filepath=fastsurfer_filepath,
+        container_path=container_path,
     )
 
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
@@ -96,62 +99,3 @@ def run_fastsurfer(
             "Failed to run FastSurfer for subject sub-{subject}.",
             subject=subject,
         )
-
-
-def run_subregion_segmentation(
-    subject: str,
-    *,
-    subregion: str,
-    subjects_dir: Path,
-    containers_dir: Path = CONTAINERS_HOME,
-    freesurfer_home: Path = FREESURFER_HOME,
-    nprocs: int = 16,
-    version: str = FREESURFER_VERSION,
-) -> None:
-    freesurfer_filepath = build_apptainer_container(
-        directory=containers_dir,
-        organization="freesurfer",
-        package="freesurfer",
-        version=version,
-    )
-
-    command = [
-        "/usr/bin/env",
-        "apptainer",
-        "exec",
-        "--cleanenv",
-        "--bind",
-        f"{subjects_dir}:/subjects_dir",
-        "--bind",
-        f"{freesurfer_home}:/freesurfer",
-        "--env",
-        "FS_LICENSE=/freesurfer/license.txt",
-        str(freesurfer_filepath),
-        "segment_subregions",
-        subregion,
-        "--cross",
-        f"sub-{subject}",
-        "--sd",
-        "/subjects_dir",
-        "--threads",
-        f"{nprocs}",
-    ]
-    logger.info(
-        f"Running {subregion} segmentation for subject sub-{subject}"
-        f" using FreeSurfer container at {freesurfer_filepath} ...",
-    )
-
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    logger.debug(output.stdout)
-
-    if output.returncode == 0:
-        logger.info(
-            f"Successfully ran subregion segmentation for subject sub-{subject}.",
-        )
-    else:
-        logger.error(f"Failed to run subregion segmentation for subject sub-{subject}.")
