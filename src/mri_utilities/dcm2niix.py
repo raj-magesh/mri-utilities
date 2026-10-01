@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from typing import TYPE_CHECKING, Literal
 
@@ -31,11 +32,6 @@ def run_dcm2niix(
             z = "n"
         case _:
             raise ValueError
-
-    command = [
-        "/usr/bin/env",
-        "dcm2niix",
-    ]
 
     options = [
         # create BIDS sidecar
@@ -76,9 +72,14 @@ def run_dcm2niix(
         input_directory=input_directory,
     )
 
+    dcm2niix = shutil.which("dcm2niix")
+    if dcm2niix is None:
+        msg = "dcm2niix not found"
+        raise RuntimeError(msg)
+
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
-            *command,
+            dcm2niix,
             *options,
             str(input_directory),
         ],
@@ -87,8 +88,16 @@ def run_dcm2niix(
         check=False,
     )
     logger.debug(output.stdout)
+    if output.stdout:
+        logger.info("dcm2niix stdout: {output}", output=output.stdout.rstrip())
+
+    if output.stderr:
+        logger.error("dcm2niix stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
         logger.info("Successfully ran dcm2niix.")
     else:
-        logger.error("Failed to run dcm2niix.")
+        logger.error(
+            "Failed to run dcm2niix with return code {code}.",
+            code=output.returncode,
+        )
