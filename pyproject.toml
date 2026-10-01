@@ -32,7 +32,7 @@ dependencies = [
     "heudiconv>=1.5.0",
     "nibabel>=5.4.2",
     "numpy>=2.5.2",
-    "antspyx==0.5.3",         # FIXME(antspyx): bump version when antspy cuts a new release that allows a higher scipy (currently forces scipy<0.16)
+    "dipy",
     "tqdm>=4.70.0",
     "nilearn>=0.14.1",
 ]
