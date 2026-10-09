@@ -28,13 +28,12 @@ dependencies = [
     "requests>=2.34.2",
     "platformdirs>=4.11.7",
     "loguru>=0.7.3",
+    "tqdm>=4.70.0",
     "dcm2niix>=1.0.20260724",
     "heudiconv>=1.5.0",
     "nibabel>=5.4.2",
     "numpy>=2.5.2",
     "dipy",
-    "tqdm>=4.70.0",
-    "nilearn>=0.14.1",
 ]
 import-names = ["mri_utilities"]
 
@@ -45,6 +44,24 @@ dev = ["ruff", "ty", "deptry", "pytest", "sphinx"]
 required-environments = [
     "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
+
+[tool.ruff]
+preview = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "missing-copyright-notice",
+    "line-too-long",
+    "missing-todo-link",
+    "missing-todo-author",
+]
+pydocstyle.convention = "numpy"
+logger-objects = ["loguru.logger"]
+typing-modules = ["numpy.typing"]
+
+[tool.deptry]
+known_first_party = ["mri_utilities"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["heudiconv", "dcm2niix"]

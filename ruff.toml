@@ -1,6 +1,0 @@
-preview = true
-
-[lint]
-select = ["ALL"]
-ignore = ["missing-copyright-notice"]
-pydocstyle.convention = "numpy"
