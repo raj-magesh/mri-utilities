@@ -106,10 +106,14 @@ def build_apptainer_container(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
+    if output.stdout:
+        logger.info("Apptainer stdout: {output}", output=output.stdout.rstrip())
+
+    if output.stderr:
+        logger.error("Apptainer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
-        logger.info(
+        logger.success(
             "Successfully built {package}-{version} container at {filepath}.",
             package=package,
             version=version,

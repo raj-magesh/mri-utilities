@@ -69,10 +69,14 @@ def run_subregion_segmentation(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
+    if output.stdout:
+        logger.info("FreeSurfer stdout: {output}", output=output.stdout.rstrip())
+
+    if output.stderr:
+        logger.error("FreeSurfer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
-        logger.info(
+        logger.success(
             "Successfully ran {subregion} segmentation for subject sub-{subject}.",
             subregion=subregion,
             subject=subject,

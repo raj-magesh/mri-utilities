@@ -72,14 +72,10 @@ def run_dcm2niix(
         input_directory=input_directory,
     )
 
-    dcm2niix = shutil.which("dcm2niix")
-    if dcm2niix is None:
-        msg = "dcm2niix not found"
-        raise RuntimeError(msg)
-
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
-            dcm2niix,
+            "/usr/bin/env",
+            "dcm2niix",
             *options,
             str(input_directory),
         ],
@@ -87,7 +83,6 @@ def run_dcm2niix(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
     if output.stdout:
         logger.info("dcm2niix stdout: {output}", output=output.stdout.rstrip())
 
@@ -95,7 +90,7 @@ def run_dcm2niix(
         logger.error("dcm2niix stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
-        logger.info("Successfully ran dcm2niix.")
+        logger.success("Successfully ran dcm2niix.")
     else:
         logger.error(
             "Failed to run dcm2niix with return code {code}.",

@@ -29,9 +29,10 @@ def run_fastsurfer(
     )
 
     (data_dir / "derivatives" / f"fastsurfer-{version}").mkdir(
-        exist_ok=True, parents=True
+        exist_ok=True,
+        parents=True,
     )
-    t1_path = Path(f"rawdata/sub-{subject}/anat/sub-{subject}_rec-defaced_T1w.nii.gz")
+    t1_path = Path(f"rawdata/sub-{subject}/anat/sub-{subject}_T1w.nii.gz")
 
     fastsurfer_min_voxel_size = 0.7
     min_voxel_size = min(nib.nifti1.load(data_dir / t1_path).header.get_zooms())
@@ -63,7 +64,7 @@ def run_fastsurfer(
         "--fs_license",
         "/freesurfer/license.txt",
         "--t1",
-        f"/data/rawdata/sub-{subject}/anat/sub-{subject}_rec-defaced_T1w.nii.gz",
+        f"/data/rawdata/sub-{subject}/anat/sub-{subject}_T1w.nii.gz",
         "--sid",
         f"sub-{subject}",
         "--sd",
@@ -87,10 +88,14 @@ def run_fastsurfer(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
+    if output.stdout:
+        logger.info("FastSurfer stdout: {output}", output=output.stdout.rstrip())
+
+    if output.stderr:
+        logger.error("FastSurfer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
-        logger.info(
+        logger.success(
             "Successfully ran FastSurfer for subject sub-{subject}.",
             subject=subject,
         )

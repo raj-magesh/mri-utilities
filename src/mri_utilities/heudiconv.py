@@ -43,9 +43,13 @@ def run_heudiconv(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
+    if output.stdout:
+        logger.info("HeuDiConv stdout: {output}", output=output.stdout.rstrip())
+
+    if output.stderr:
+        logger.error("HeuDiConv stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
-        logger.info("Successfully ran heudiconv.")
+        logger.success("Successfully ran heudiconv.")
     else:
         logger.error("Failed to run heudiconv.")

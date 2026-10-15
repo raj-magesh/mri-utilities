@@ -130,14 +130,17 @@ def _run_mriprep(
 
     options.extend(list(extra_options))
 
-    print(" ".join([*command_prefix, *options]))
-    return
     logger.info(
         "Running {mriprep} for subject {subject}"
         " using {mriprep} container at {mriprep_filepath} ...",
         mriprep=mriprep,
         subject=subject,
         mriprep_filepath=container_path,
+    )
+    logger.debug(
+        "{mriprep} command: {command}",
+        mriprep=mriprep,
+        command=" ".join([*command_prefix, *options]),
     )
 
     output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
@@ -146,10 +149,22 @@ def _run_mriprep(
         text=True,
         check=False,
     )
-    logger.debug(output.stdout)
+    if output.stdout:
+        logger.info(
+            "{mriprep} stdout: {output}",
+            mriprep=mriprep,
+            output=output.stdout.rstrip(),
+        )
+
+    if output.stderr:
+        logger.error(
+            "{mriprep} stderr: {error}",
+            mriprep=mriprep,
+            error=output.stderr.rstrip(),
+        )
 
     if output.returncode == 0:
-        logger.info(
+        logger.success(
             "Successfully ran {mriprep} for subject {subject}.",
             mriprep=mriprep,
             subject=subject,
@@ -160,4 +175,3 @@ def _run_mriprep(
             mriprep=mriprep,
             subject=subject,
         )
-        raise RuntimeError
