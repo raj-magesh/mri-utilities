@@ -1,26 +1,24 @@
 import importlib.resources
-import tempfile
-from contextlib import ExitStack
-from pathlib import Path
 
-import ants
 import nibabel as nib
 import numpy as np
-from loguru import logger
+from dipy.align import affine_registration
+from dipy.align.imaffine import AffineMap
 
 
 def deface(
-    img: nib.nifti1.Nifti1Image,
+    source_img: nib.nifti1.Nifti1Image,
     *,
-    target_template: Path | None = None,
-    target_deface_mask: Path | None = None,
-    type_of_transform: str = "SyN",
-    precomputed_mask_path: Path | None = None,
+    target_template_img: nib.nifti1.Nifti1Image | None = None,
+    target_deface_mask: nib.nifti1.Nifti1Image | None = None,
+    precomputed_mask: nib.nifti1.Nifti1Image | None = None,
     **registration_kws,  # ruff: ignore[missing-type-kwargs]
 ) -> tuple[nib.nifti1.Nifti1Image, nib.nifti1.Nifti1Image]:
     """Deface a NIfTI-1 brain image to anonymize it.
 
-    We use ANTsPy to register the provided image to an anatomical template with
+    Adapted from https://github.com/neurolabusc/mydeface.
+
+    We use DIPY to register the provided image to an anatomical template with
     a corresponding deface mask. The deface mask is resampled back into the
     input space, and a defaced image is written.
 
@@ -35,83 +33,69 @@ def deface(
         Deface mask corresponding to `mni_template`, by default None. If None,
         will use a deface mask corresponding to the included 2 mm MNI152 T1
         image.
-    type_of_transform, optional
-        Type of transform used in the `ANTs registration step`_, by default "SyN".
-
-        .. _ANTs registration step: https://antspy.readthedocs.io/en/stable/registration.html
-    precomputed_mask_path, optional
+    precomputed_mask, optional
         If provided, this mask will be used directly for defacing and no alignment is performed.
     registration_kwargs: optional
-        Extra keyword arguments are passed to `ants.registration`.
+        Extra keyword arguments passed to `dipy.align._public.syn_registration`.
 
     Returns
     -------
         The defaced image and the corresponding defacing mask
     """
-    if precomputed_mask_path is None:
-        with ExitStack() as stack:
-            deface_package = importlib.resources.files("mri_utilities.defacing")
+    if precomputed_mask is None:
+        deface_package = importlib.resources.files("mri_utilities.defacing")
 
-            if target_template is None:
-                target_template = stack.enter_context(
-                    importlib.resources.as_file(
-                        deface_package / "MNI152_T1_2mm.nii.gz",
-                    ),
-                )
+        if target_template_img is None:
+            with importlib.resources.as_file(
+                deface_package / "MNI152_T1_2mm.nii.gz",
+            ) as f:
+                target_template_img = nib.nifti1.load(f)
 
-            if target_deface_mask is None:
-                target_deface_mask = stack.enter_context(
-                    importlib.resources.as_file(deface_package / "MNI_mask.nii.gz"),
-                )
+        with importlib.resources.as_file(deface_package / "MNI_mask.nii.gz") as f:
+            target_deface_mask = nib.nifti1.load(f)
 
-            with tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False) as tmp:
-                input_path = Path(tmp.name)
-                img.to_filename(input_path)
+        _, affine = affine_registration(
+            moving=target_template_img,
+            static=source_img,
+            moving_affine=source_img.affine,
+            static_affine=target_template_img.affine,
+            pipeline=["translation", "rigid", "affine"],
+            **{"sampling_proportion": 0.2} | registration_kws,
+        )
 
-            try:
-                source_img = ants.image_read(str(input_path))
-            finally:
-                input_path.unlink(missing_ok=True)
+        affine_map = AffineMap(
+            affine,
+            domain_grid_shape=source_img.shape,
+            domain_grid2world=source_img.affine,
+            codomain_grid_shape=target_deface_mask.shape,
+            codomain_grid2world=target_deface_mask.affine,
+        )
 
-            target_template_img = ants.image_read(str(target_template))
-            target_deface_mask_img = ants.image_read(str(target_deface_mask))
+        deface_mask = affine_map.transform(
+            target_deface_mask.get_fdata(),
+            interpolation="linear",
+        )
 
-            logger.info("Registering image to MNI space...")
-            registration = ants.registration(
-                fixed=source_img,
-                moving=target_template_img,
-                type_of_transform=type_of_transform,
-                **registration_kws,
-            )
-
-            logger.info("Resampling MNI mask to input space...")
-            source_deface_mask_img = ants.apply_transforms(
-                fixed=source_img,
-                moving=target_deface_mask_img,
-                transformlist=registration["fwdtransforms"],
-                interpolator="nearestNeighbor",
-            )
-
-            threshold = 0.5
-            deface_mask = source_deface_mask_img.numpy() > threshold
+        threshold = 0.5
+        deface_mask = deface_mask > threshold
     else:
-        deface_mask = nib.nifti1.load(precomputed_mask_path).get_fdata()
+        deface_mask = precomputed_mask.get_fdata()
 
     deface_mask = deface_mask.astype(np.uint8)
 
-    masked = img.get_fdata(dtype=np.float32)
+    masked = source_img.get_fdata(dtype=np.float32)
     masked[deface_mask == 0] = 0
 
     output_img = nib.nifti1.Nifti1Image(
-        masked.astype(img.get_data_dtype()),
-        header=img.header,
-        affine=img.affine,
+        masked.astype(source_img.get_data_dtype()),
+        header=source_img.header,
+        affine=source_img.affine,
     )
 
     output_mask = nib.nifti1.Nifti1Image(
         deface_mask,
-        header=img.header,
-        affine=img.affine,
+        header=source_img.header,
+        affine=source_img.affine,
     )
 
     return output_img, output_mask
