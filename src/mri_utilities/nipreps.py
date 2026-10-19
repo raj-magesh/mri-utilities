@@ -157,7 +157,7 @@ def _run_mriprep(
         )
 
     if output.stderr:
-        logger.error(
+        logger.warning(
             "{mriprep} stderr: {error}",
             mriprep=mriprep,
             error=output.stderr.rstrip(),
@@ -171,7 +171,8 @@ def _run_mriprep(
         )
     else:
         logger.error(
-            "Failed to run {mriprep} for subject {subject}.",
+            "Failed to run {mriprep} for subject {subject} (exit code {code}).",
             mriprep=mriprep,
             subject=subject,
+            code=output.returncode,
         )

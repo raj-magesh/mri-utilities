@@ -92,7 +92,7 @@ def run_fastsurfer(
         logger.info("FastSurfer stdout: {output}", output=output.stdout.rstrip())
 
     if output.stderr:
-        logger.error("FastSurfer stderr: {error}", error=output.stderr.rstrip())
+        logger.warning("FastSurfer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
         logger.success(
@@ -101,6 +101,7 @@ def run_fastsurfer(
         )
     else:
         logger.error(
-            "Failed to run FastSurfer for subject sub-{subject}.",
+            "Failed to run FastSurfer for subject sub-{subject} (exit code {code}).",
             subject=subject,
+            code=output.returncode,
         )

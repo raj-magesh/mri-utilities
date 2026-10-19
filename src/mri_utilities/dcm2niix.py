@@ -1,5 +1,4 @@
-import shutil
-import subprocess
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -87,12 +86,12 @@ def run_dcm2niix(
         logger.info("dcm2niix stdout: {output}", output=output.stdout.rstrip())
 
     if output.stderr:
-        logger.error("dcm2niix stderr: {error}", error=output.stderr.rstrip())
+        logger.warning("dcm2niix stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
         logger.success("Successfully ran dcm2niix.")
     else:
         logger.error(
-            "Failed to run dcm2niix with return code {code}.",
+            "Failed to run dcm2niix (exit code {code}).",
             code=output.returncode,
         )

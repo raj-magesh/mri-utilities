@@ -1,6 +1,6 @@
 import os
 import shutil
-import subprocess
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import tempfile
 from pathlib import Path
 
@@ -94,7 +94,7 @@ def build_apptainer_container(
         filepath=filepath,
     )
 
-    output = subprocess.run(
+    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
         [
             "/usr/bin/env",
             "apptainer",
@@ -110,7 +110,7 @@ def build_apptainer_container(
         logger.info("Apptainer stdout: {output}", output=output.stdout.rstrip())
 
     if output.stderr:
-        logger.error("Apptainer stderr: {error}", error=output.stderr.rstrip())
+        logger.warning("Apptainer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
         logger.success(
@@ -121,10 +121,11 @@ def build_apptainer_container(
         )
     else:
         logger.error(
-            "Failed to build {package}-{version} container at {filepath}.",
+            "Failed to build {package}-{version} container at {filepath} (exit code {code}).",
             package=package,
             version=version,
             filepath=filepath,
+            code=output.returncode,
         )
 
     return filepath

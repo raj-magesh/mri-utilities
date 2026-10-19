@@ -1,4 +1,4 @@
-import subprocess
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -16,8 +16,8 @@ FREESURFER_VERSION = "8.2.0"
 
 
 def run_subregion_segmentation(
-    subject: str,
     *,
+    subject: str,
     subregion: str,
     subjects_dir: Path,
     containers_dir: Path = CONTAINERS_HOME,
@@ -73,7 +73,7 @@ def run_subregion_segmentation(
         logger.info("FreeSurfer stdout: {output}", output=output.stdout.rstrip())
 
     if output.stderr:
-        logger.error("FreeSurfer stderr: {error}", error=output.stderr.rstrip())
+        logger.warning("FreeSurfer stderr: {error}", error=output.stderr.rstrip())
 
     if output.returncode == 0:
         logger.success(
@@ -83,7 +83,8 @@ def run_subregion_segmentation(
         )
     else:
         logger.error(
-            "Failed to run {subregion} segmentation for subject sub-{subject}.",
+            "Failed to run {subregion} segmentation for subject sub-{subject} (exit code {code}).",
             subregion=subregion,
             subject=subject,
+            code=output.returncode,
         )
