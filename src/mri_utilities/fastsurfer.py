@@ -1,20 +1,15 @@
-import os
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
-import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-import requests
+import nibabel as nib
 from loguru import logger
 
 from mri_utilities._utilities import (
     CONTAINERS_HOME,
     build_apptainer_container,
     get_freesurfer_license_path,
+    run_command,
+    run_slurm_job,
 )
-
-if TYPE_CHECKING:
-    import nibabel as nib
 
 FASTSURFER_VERSION = "cpu-v2.6.0"
 
@@ -22,14 +17,35 @@ FASTSURFER_VERSION = "cpu-v2.6.0"
 def run_fastsurfer(
     *,
     subject: str,
-    t1w: nib.nifti1.Nifti1Image,
+    t1w_path: Path,
     data_dir: Path,
-    version: str,
-    containers_dir: Path = CONTAINERS_HOME,
+    version: str = FASTSURFER_VERSION,
     fs_license: Path | None = None,
+    containers_dir: Path = CONTAINERS_HOME,
+    seg_threads: int = 16,
+    surf_threads: int = 2,
     slurm: bool = False,
-    slurm_options: list[str] | None = None,
-) -> None:
+    seg_mem: str = "7G",
+    seg_partition: str = "gpu",
+    seg_cpus_per_task: int = 16,
+    seg_time: str = "00:20:00",
+    seg_extra_options: list[str] | None = None,
+    surf_mem_per_cpu: str = "3G",
+    surf_partition: str = "cpu",
+    surf_cpus_per_task: int = 2,
+    surf_time: str = "04:00:00",
+    surf_extra_options: list[str] | None = None,
+) -> int | None:
+    fastsurfer_dir = data_dir / "derivatives" / f"fastsurfer-{version}"
+    if (fastsurfer_dir / f"sub-{subject}" / "scripts" / "recon-surf.done").exists():
+        logger.info(
+            "FastSurfer has already been run for sub-{subject}",
+            subject=subject,
+        )
+        return None
+
+    fastsurfer_dir.mkdir(exist_ok=True, parents=True)
+
     container_path = build_apptainer_container(
         directory=containers_dir,
         organization="deepmi",
@@ -37,13 +53,8 @@ def run_fastsurfer(
         version=version,
     )
 
-    (data_dir / "derivatives" / f"fastsurfer-{version}").mkdir(
-        exist_ok=True,
-        parents=True,
-    )
-
     fastsurfer_min_voxel_size = 0.7
-    min_voxel_size = min(t1w.header.get_zooms())
+    min_voxel_size = min(nib.nifti1.load(t1w_path).header.get_zooms())
     if min_voxel_size < fastsurfer_min_voxel_size:
         logger.info(
             "Setting `--vox_size {fastsurfer_min_voxel_size}` since FastSurfer isn't validated with higher resolution images (current minimum voxel dimension: {min_voxel_size:.1f} mm)",
@@ -56,25 +67,58 @@ def run_fastsurfer(
 
     fs_license = fs_license or get_freesurfer_license_path()
 
-    apptainer_options = [
-        "--cleanenv",
-        "--no-home",
+    binds = [
         "--bind",
         f"{data_dir}:{data_dir}",
         "--bind",
         f"{fs_license}:{fs_license}",
+        "--bind",
+        f"{t1w_path.parent}:{t1w_path.parent}",
     ]
 
-    shared_fastsurfer_args = [
+    prefix_fastsurfer = [
+        "/usr/bin/env",
+        "apptainer",
+        "exec",
+        "--cleanenv",
+        "--no-mount",
+        "home,cwd",
+        "--env",
+        "TQDM_DISABLE=1",
+        *binds,
+    ]
+
+    suffix_fastsurfer = [
+        str(container_path),
+        "/fastsurfer/run_fastsurfer.sh",
+        "--t1",
+        f"{t1w_path}",
+        "--sid",
+        f"sub-{subject}",
         "--fs_license",
         f"{fs_license}",
         "--sd",
-        f"{data_dir}/derivatives/fastsurfer-{version}",
-        "--sid",
-        f"sub-{subject}",
+        f"{fastsurfer_dir}",
         "--3T",
         "--vox_size",
         f"{vox_size}",
+    ]
+
+    command_seg = [
+        *prefix_fastsurfer,
+        "--nv",
+        *suffix_fastsurfer,
+        "--seg_only",
+        "--threads",
+        str(seg_threads),
+    ]
+
+    command_surf = [
+        *prefix_fastsurfer,
+        *suffix_fastsurfer,
+        "--surf_only",
+        "--threads",
+        str(surf_threads),
     ]
 
     logger.info(
@@ -84,100 +128,65 @@ def run_fastsurfer(
         container_path=container_path,
     )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        t1w_path = Path(temp_dir) / f"sub-{subject}_T1w.nii.gz"
-        t1w.to_filename(t1w_path)
-        apptainer_options.extend([
-            "--bind",
-            f"{t1w_path.parent}:{t1w_path.parent}",
-        ])
+    if slurm:
+        log_dir = fastsurfer_dir / "logs"
+        log_dir.mkdir(exist_ok=True, parents=True)
 
-        if slurm:
-            tag = version.rsplit("-", maxsplit=1)[-1]
-            filenames = [
-                "srun_fastsurfer.sh",
-                "brun_fastsurfer.sh",
-                "stools.sh",
-            ]
+        output = run_slurm_job(
+            command=command_seg,
+            description=f"SLURM job for FastSurfer-seg for sub-{subject}",
+            slurm_options=[
+                "--output",
+                f"{log_dir}/sub-{subject}_%x-%j.log",
+                "--ntasks",
+                "1",
+                "--nodes",
+                "1",
+                "--job-name",
+                "FastSurfer_seg",
+                "--partition",
+                str(seg_partition),
+                "--mem",
+                str(seg_mem),
+                "--cpus-per-task",
+                str(seg_cpus_per_task),
+                "--gres=gpu:1",
+                "--time",
+                str(seg_time),
+                *(seg_extra_options or []),
+            ],
+        )
+        seg_job_id = int(output.stdout.strip().split(";")[0])
 
-            for filename in filenames:
-                script_path = Path(temp_dir) / filename
-                url = (
-                    "https://raw.githubusercontent.com/Deep-MI/FastSurfer/"
-                    f"{tag}/{filename}"
-                )
+        output = run_slurm_job(
+            command=command_surf,
+            description=f"SLURM job for FastSurfer-surf for sub-{subject}",
+            slurm_options=[
+                "--job-name",
+                "FastSurfer_surf",
+                "--depend",
+                f"afterok:{seg_job_id}",
+                "--partition",
+                str(surf_partition),
+                "--mem-per-cpu",
+                str(surf_mem_per_cpu),
+                "--cpus-per-task",
+                str(surf_cpus_per_task),
+                "--time",
+                str(surf_time),
+                "--hint",
+                "nomultithread",
+                *(surf_extra_options or []),
+            ],
+        )
+        return int(output.stdout.strip().split(";")[0])
 
-                response = requests.get(url, timeout=30)
-                response.raise_for_status()
-                script_path.write_bytes(response.content)
-
-            cache_home = Path(
-                os.getenv(
-                    "CACHE_HOME",
-                    os.getenv("XDG_CACHE_HOME", str(Path.home() / ".cache")),
-                ),
-            )
-            cache_dir = cache_home / f"fastsurfer-{version}" / f"sub-{subject}"
-            cache_dir.mkdir(exist_ok=True, parents=True)
-            apptainer_options.extend([
-                "--bind",
-                f"{cache_dir}:{cache_dir}",
-            ])
-
-            command = [
-                "/usr/bin/env",
-                "bash",
-                str(Path(temp_dir) / "srun_fastsurfer.sh"),
-                "--data",
-                f"{t1w_path.parent}",
-                "--work",
-                str(cache_dir),
-                "--singularity_image",
-                str(container_path),
-                "--extra_singularity_options",
-                " ".join(apptainer_options),
-                *(slurm_options or []),
-                *shared_fastsurfer_args,
-            ]
-            _run_command(command=command, subject=subject)
-        else:
-            command = [
-                "/usr/bin/env",
-                "apptainer",
-                "exec",
-                *apptainer_options,
-                "--nv",
-                str(container_path),
-                "/fastsurfer/run_fastsurfer.sh",
-                *shared_fastsurfer_args,
-                "--t1",
-                f"{t1w_path}",
-            ]
-            _run_command(command=command, subject=subject)
-
-
-def _run_command(*, command: list[str], subject: str) -> None:
-    logger.info("{command}", command=" ".join(command))
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
+    run_command(
+        command=command_seg,
+        description=f"FastSurfer-seg for sub-{subject}",
     )
-    if output.stdout:
-        logger.info("FastSurfer stdout: {output}", output=output.stdout.rstrip())
-
-    if output.stderr:
-        logger.warning("FastSurfer stderr: {error}", error=output.stderr.rstrip())
-
-    if output.returncode == 0:
-        logger.success(
-            "Successfully ran FastSurfer for subject sub-{subject}.",
-            subject=subject,
-        )
-    else:
-        logger.error(
-            "Failed to run FastSurfer for subject sub-{subject} (exit code {code}).",
-            subject=subject,
-            code=output.returncode,
-        )
+    run_command(
+        command=command_seg,
+        description=f"FastSurfer-surf for sub-{subject}",
+    )
+    return None

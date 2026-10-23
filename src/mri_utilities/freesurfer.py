@@ -1,4 +1,3 @@
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -7,6 +6,8 @@ from mri_utilities._utilities import (
     CONTAINERS_HOME,
     build_apptainer_container,
     get_freesurfer_license_path,
+    run_command,
+    run_slurm_job,
 )
 
 if TYPE_CHECKING:
@@ -24,8 +25,28 @@ def run_subregion_segmentation(
     fs_license: Path | None = None,
     nprocs: int = 16,
     version: str = FREESURFER_VERSION,
-) -> None:
-    freesurfer_filepath = build_apptainer_container(
+    slurm: bool = False,
+    mem: str = "32G",
+    partition: str = "cpu",
+    cpus_per_task: int = 16,
+    time: str = "04:00:00",
+    extra_slurm_options: list[str] | None = None,
+) -> int | None:
+    freesurfer_dir = subjects_dir.parent / f"freesurfer-{version}"
+    if (
+        subregion == "thalamus"
+        and (freesurfer_dir / f"sub-{subject}" / "mri" / "ThalamicNuclei.mgz").exists()
+    ):
+        logger.info(
+            "FreeSurfer subregion ({subregion}) segmentation has already been run for sub-{subject}",
+            subject=subject,
+            subregion=subregion,
+        )
+        return None
+    # TODO: add end conditions for other subregions
+    freesurfer_dir.mkdir(exist_ok=True, parents=True)
+
+    container_filepath = build_apptainer_container(
         directory=containers_dir,
         organization="freesurfer",
         package="freesurfer",
@@ -40,18 +61,18 @@ def run_subregion_segmentation(
         "exec",
         "--cleanenv",
         "--bind",
-        f"{subjects_dir}:/subjects_dir",
+        f"{subjects_dir}:{subjects_dir}",
         "--bind",
-        f"{fs_license.parent}:/freesurfer",
+        f"{fs_license}:{fs_license}",
         "--env",
-        "FS_LICENSE=/freesurfer/license.txt",
-        str(freesurfer_filepath),
+        f"FS_LICENSE={fs_license}",
+        str(container_filepath),
         "segment_subregions",
         subregion,
         "--cross",
         f"sub-{subject}",
         "--sd",
-        "/subjects_dir",
+        f"{subjects_dir}",
         "--threads",
         f"{nprocs}",
     ]
@@ -60,31 +81,39 @@ def run_subregion_segmentation(
         " using FreeSurfer container at {freesurfer_filepath} ...",
         subregion=subregion,
         subject=subject,
-        freesurfer_filepath=freesurfer_filepath,
+        freesurfer_filepath=container_filepath,
     )
+    if slurm:
+        log_dir = freesurfer_dir / "logs"
+        log_dir.mkdir(exist_ok=True, parents=True)
 
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
+        output = run_slurm_job(
+            command=command,
+            description=f"SLURM job for FreeSurfer subregion segmentation for sub-{subject}",
+            slurm_options=[
+                "--output",
+                f"{log_dir}/sub-{subject}_%x-%j.log",
+                "--ntasks",
+                "1",
+                "--nodes",
+                "1",
+                "--job-name",
+                "FreeSurfer_subregion_segmentation",
+                "--partition",
+                str(partition),
+                "--mem",
+                str(mem),
+                "--cpus-per-task",
+                str(cpus_per_task),
+                "--time",
+                str(time),
+                *(extra_slurm_options or []),
+            ],
+        )
+        return int(output.stdout.strip().split(";")[0])
+
+    run_command(
+        command=command,
+        description=f"FreeSurfer subregion segmentation for sub-{subject}",
     )
-    if output.stdout:
-        logger.info("FreeSurfer stdout: {output}", output=output.stdout.rstrip())
-
-    if output.stderr:
-        logger.warning("FreeSurfer stderr: {error}", error=output.stderr.rstrip())
-
-    if output.returncode == 0:
-        logger.success(
-            "Successfully ran {subregion} segmentation for subject sub-{subject}.",
-            subregion=subregion,
-            subject=subject,
-        )
-    else:
-        logger.error(
-            "Failed to run {subregion} segmentation for subject sub-{subject} (exit code {code}).",
-            subregion=subregion,
-            subject=subject,
-            code=output.returncode,
-        )
+    return None

@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import tempfile
@@ -129,3 +130,79 @@ def build_apptainer_container(
         )
 
     return filepath
+
+
+def run_command(
+    *,
+    command: list[str],
+    description: str = "",
+) -> subprocess.CompletedProcess:
+    logger.debug(
+        "{description} command: {command}",
+        description=description,
+        command=" ".join(command),
+    )
+
+    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if output.stdout:
+        logger.info(
+            "{description} stdout: {output}",
+            description=description,
+            output=output.stdout.rstrip(),
+        )
+
+    if output.stderr:
+        logger.warning(
+            "{description} stderr: {error}",
+            description=description,
+            error=output.stderr.rstrip(),
+        )
+
+    if output.returncode == 0:
+        logger.success(
+            "Successfully ran command ({description})",
+            description=description,
+        )
+    else:
+        logger.error(
+            "Failed to run command ({description}) (exit code {code}).",
+            description=description,
+            code=output.returncode,
+        )
+
+    return output
+
+
+def run_slurm_job(
+    *,
+    command: list[str],
+    description: str,
+    slurm_options: list[str],
+) -> subprocess.CompletedProcess:
+    with tempfile.TemporaryDirectory(prefix=f"{description}-") as tmp:
+        tmpdir = Path(tmp)
+
+        script_path = tmpdir / f"{description}.sh"
+        write_srun_script(path=script_path, command=command)
+
+        return run_command(
+            command=[
+                "sbatch",
+                "--parsable",
+                *slurm_options,
+                str(script_path),
+            ],
+        )
+
+
+def write_srun_script(*, path: Path, command: list[str]) -> None:
+    path.write_text(
+        f"#!/usr/bin/env bash\nset -euo pipefail\nsrun {shlex.join(command)}\n",
+        encoding="UTF-8",
+    )

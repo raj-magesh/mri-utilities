@@ -1,5 +1,4 @@
 import os
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -9,6 +8,8 @@ from mri_utilities._utilities import (
     CONTAINERS_HOME,
     build_apptainer_container,
     get_freesurfer_license_path,
+    run_command,
+    run_slurm_job,
 )
 
 if TYPE_CHECKING:
@@ -17,14 +18,14 @@ if TYPE_CHECKING:
 MRIPrep = Literal["fMRIPrep", "sMRIPrep"]
 
 SMRIPREP_VERSION = "0.20.0"
-FMRIPREP_VERSION = "25.2.5"
+FMRIPREP_VERSION = "25.2.7"
 
 
-def run_fmriprep(*args, **kwargs) -> None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
+def run_fmriprep(*args, **kwargs) -> int | None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
     return _run_mriprep(*args, mriprep="fMRIPrep", **kwargs)
 
 
-def run_smriprep(*args, **kwargs) -> None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
+def run_smriprep(*args, **kwargs) -> int | None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
     return _run_mriprep(*args, mriprep="sMRIPrep", **kwargs)
 
 
@@ -41,7 +42,27 @@ def _run_mriprep(
     output_spaces: Sequence[str] = ("MNI152NLin2009cAsym", "T1w", "fsnative"),
     use_fastsurfer_outputs: bool = True,
     extra_options: Sequence[str] = (),
-) -> None:
+    slurm: bool = False,
+    mem: str = "32G",
+    partition: str = "cpu",
+    cpus_per_task: int = 16,
+    time: str = "04:00:00",
+    extra_slurm_options: list[str] | None = None,
+) -> int | None:
+    mriprep_dir = data_dir / "derivatives" / f"{mriprep.lower()}-{version}"
+    if (
+        mriprep == "sMRIPrep"
+        and (mriprep_dir / "smriprep" / f"sub-{subject}.html").exists()
+    ) or (mriprep == "fMRIPrep" and (mriprep_dir / f"sub-{subject}.html").exists()):
+        logger.info(
+            "{mriprep} has already been run for sub-{subject}",
+            mriprep=mriprep,
+            subject=subject,
+        )
+        return None
+
+    mriprep_dir.mkdir(exist_ok=True, parents=True)
+
     if work_dir is None:
         if xdg_cache_home := os.getenv("XDG_CACHE_HOME"):
             work_dir = Path(xdg_cache_home) / f"{mriprep}-{version}"
@@ -55,11 +76,6 @@ def _run_mriprep(
                 version = SMRIPREP_VERSION
             case "fMRIPrep":
                 version = FMRIPREP_VERSION
-
-    (data_dir / "derivatives" / f"{mriprep.lower()}-{version}").mkdir(
-        exist_ok=True,
-        parents=True,
-    )
 
     container_path = build_apptainer_container(
         directory=containers_dir,
@@ -137,42 +153,34 @@ def _run_mriprep(
         subject=subject,
         mriprep_filepath=container_path,
     )
-    logger.debug(
-        "{mriprep} command: {command}",
-        mriprep=mriprep,
-        command=" ".join([*command_prefix, *options]),
-    )
+    command = [*command_prefix, *options]
+    if slurm:
+        log_dir = mriprep_dir / "logs"
+        log_dir.mkdir(exist_ok=True, parents=True)
 
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        [*command_prefix, *options],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if output.stdout:
-        logger.info(
-            "{mriprep} stdout: {output}",
-            mriprep=mriprep,
-            output=output.stdout.rstrip(),
+        output = run_slurm_job(
+            command=command,
+            description=f"SLURM job for {mriprep} for sub-{subject}",
+            slurm_options=[
+                "--output",
+                f"{log_dir}/sub-{subject}_%x-%j.log",
+                "--ntasks",
+                "1",
+                "--nodes",
+                "1",
+                "--job-name",
+                mriprep,
+                "--partition",
+                str(partition),
+                "--mem",
+                str(mem),
+                "--cpus-per-task",
+                str(cpus_per_task),
+                "--time",
+                str(time),
+                *(extra_slurm_options or []),
+            ],
         )
-
-    if output.stderr:
-        logger.warning(
-            "{mriprep} stderr: {error}",
-            mriprep=mriprep,
-            error=output.stderr.rstrip(),
-        )
-
-    if output.returncode == 0:
-        logger.success(
-            "Successfully ran {mriprep} for subject {subject}.",
-            mriprep=mriprep,
-            subject=subject,
-        )
-    else:
-        logger.error(
-            "Failed to run {mriprep} for subject {subject} (exit code {code}).",
-            mriprep=mriprep,
-            subject=subject,
-            code=output.returncode,
-        )
+        return int(output.stdout.strip().split(";")[0])
+    run_command(command=command, description=f"{mriprep} for sub-{subject}")
+    return None
