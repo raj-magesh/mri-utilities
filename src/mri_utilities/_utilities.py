@@ -88,46 +88,18 @@ def build_apptainer_container(
     if filepath.exists():
         return filepath
 
-    logger.info(
-        "Attempting to build {package}-{version} container at {filepath}...",
-        package=package,
-        version=version,
-        filepath=filepath,
+    command = [
+        "/usr/bin/env",
+        "apptainer",
+        "build",
+        str(filepath),
+        f"docker://{organization}/{package}:{version}",
+    ]
+
+    run_command(
+        command=command,
+        description=f"Building {package}-{version} Apptainer container at {filepath}",
     )
-
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        [
-            "/usr/bin/env",
-            "apptainer",
-            "build",
-            str(filepath),
-            f"docker://{organization}/{package}:{version}",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if output.stdout:
-        logger.info("Apptainer stdout: {output}", output=output.stdout.rstrip())
-
-    if output.stderr:
-        logger.warning("Apptainer stderr: {error}", error=output.stderr.rstrip())
-
-    if output.returncode == 0:
-        logger.success(
-            "Successfully built {package}-{version} container at {filepath}.",
-            package=package,
-            version=version,
-            filepath=filepath,
-        )
-    else:
-        logger.error(
-            "Failed to build {package}-{version} container at {filepath} (exit code {code}).",
-            package=package,
-            version=version,
-            filepath=filepath,
-            code=output.returncode,
-        )
 
     return filepath
 

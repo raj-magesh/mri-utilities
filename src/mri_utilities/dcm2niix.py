@@ -1,7 +1,6 @@
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
 from typing import TYPE_CHECKING, Literal
 
-from loguru import logger
+from mri_utilities._utilities import run_command
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,32 +65,12 @@ def run_dcm2niix(
             str(output_directory),
         ])
 
-    logger.info(
-        "Running dcm2niix on {input_directory} ...",
-        input_directory=input_directory,
-    )
-
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-        [
+    run_command(
+        command=[
             "/usr/bin/env",
             "dcm2niix",
             *options,
             str(input_directory),
         ],
-        capture_output=True,
-        text=True,
-        check=False,
+        description=f"dcm2niix on {input_directory}",
     )
-    if output.stdout:
-        logger.info("dcm2niix stdout: {output}", output=output.stdout.rstrip())
-
-    if output.stderr:
-        logger.warning("dcm2niix stderr: {error}", error=output.stderr.rstrip())
-
-    if output.returncode == 0:
-        logger.success("Successfully ran dcm2niix.")
-    else:
-        logger.error(
-            "Failed to run dcm2niix (exit code {code}).",
-            code=output.returncode,
-        )
