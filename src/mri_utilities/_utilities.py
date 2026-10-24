@@ -1,7 +1,7 @@
 import os
 import shlex
 import shutil
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -115,7 +115,7 @@ def run_command(
         command=" ".join(command),
     )
 
-    output = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+    output = subprocess.run(
         command,
         capture_output=True,
         text=True,
@@ -170,6 +170,7 @@ def run_slurm_job(
                 *slurm_options,
                 str(script_path),
             ],
+            description=description,
         )
 
 
