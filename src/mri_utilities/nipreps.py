@@ -21,11 +21,11 @@ SMRIPREP_VERSION = "0.20.0"
 FMRIPREP_VERSION = "25.2.7"
 
 
-def run_fmriprep(*args, **kwargs) -> int | None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
+def run_fmriprep(*args, **kwargs) -> int | None:
     return _run_mriprep(*args, mriprep="fMRIPrep", **kwargs)
 
 
-def run_smriprep(*args, **kwargs) -> int | None:  # ruff: ignore[missing-type-args, missing-type-kwargs]
+def run_smriprep(*args, **kwargs) -> int | None:
     return _run_mriprep(*args, mriprep="sMRIPrep", **kwargs)
 
 

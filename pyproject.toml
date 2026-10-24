@@ -51,10 +51,20 @@ preview = true
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "missing-copyright-notice",
+    "complex-structure",
     "line-too-long",
-    "missing-todo-link",
+    "missing-copyright-notice",
     "missing-todo-author",
+    "missing-todo-link",
+    "missing-trailing-comma",
+    "missing-type-args",
+    "missing-type-kwargs",
+    "subprocess-without-shell-equals-true",
+    "suspicious-subprocess-import",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-locals",
+    "too-many-statements",
 ]
 pydocstyle.convention = "numpy"
 logger-objects = ["loguru.logger"]

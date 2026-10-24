@@ -12,7 +12,7 @@ def deface(
     template_img: nib.nifti1.Nifti1Image | None = None,
     template_mask: nib.nifti1.Nifti1Image | None = None,
     precomputed_mask: nib.nifti1.Nifti1Image | None = None,
-    **registration_kws,  # ruff: ignore[missing-type-kwargs]
+    **registration_kws,
 ) -> tuple[nib.nifti1.Nifti1Image, nib.nifti1.Nifti1Image]:
     """Deface a NIfTI-1 brain image to anonymize it.
 
