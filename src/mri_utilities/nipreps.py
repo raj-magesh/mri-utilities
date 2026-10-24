@@ -49,6 +49,13 @@ def _run_mriprep(
     time: str = "04:00:00",
     extra_slurm_options: list[str] | None = None,
 ) -> int | None:
+    if version is None:
+        match mriprep:
+            case "sMRIPrep":
+                version = SMRIPREP_VERSION
+            case "fMRIPrep":
+                version = FMRIPREP_VERSION
+
     mriprep_dir = data_dir / "derivatives" / f"{mriprep.lower()}-{version}"
     if (
         mriprep == "sMRIPrep"
@@ -69,13 +76,6 @@ def _run_mriprep(
         else:
             work_dir = Path.home() / ".cache" / f"{mriprep}-{version}"
     work_dir.mkdir(exist_ok=True, parents=True)
-
-    if version is None:
-        match mriprep:
-            case "sMRIPrep":
-                version = SMRIPREP_VERSION
-            case "fMRIPrep":
-                version = FMRIPREP_VERSION
 
     container_path = build_apptainer_container(
         directory=containers_dir,
