@@ -23,13 +23,12 @@ def run_subregion_segmentation(
     subjects_dir: Path,
     containers_dir: Path = CONTAINERS_HOME,
     fs_license: Path | None = None,
-    nprocs: int = 16,
     version: str = FREESURFER_VERSION,
     slurm: bool = False,
-    mem: str = "32G",
+    mem: str = "16G",
     partition: str = "cpu",
     cpus_per_task: int = 16,
-    time: str = "04:00:00",
+    time: str = "00:15:00",
     extra_slurm_options: list[str] | None = None,
 ) -> int | None:
     freesurfer_dir = subjects_dir.parent / f"freesurfer-{version}"
@@ -74,7 +73,7 @@ def run_subregion_segmentation(
         "--sd",
         f"{subjects_dir}",
         "--threads",
-        f"{nprocs}",
+        f"{cpus_per_task}",
     ]
     logger.info(
         "Running {subregion} segmentation for subject sub-{subject}"
